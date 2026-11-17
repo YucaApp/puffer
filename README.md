@@ -1,6 +1,12 @@
-# Puffer
+<p align="center">
+  <img src="docs/icon.png" width="128" height="128" alt="Puffer's app icon: a smiling orange pufferfish on a teal rounded square">
+</p>
 
-[![CI](https://github.com/YucaApp/puffer/actions/workflows/ci.yml/badge.svg)](https://github.com/YucaApp/puffer/actions/workflows/ci.yml)
+<h1 align="center">Puffer</h1>
+
+<p align="center">
+  <a href="https://github.com/YucaApp/puffer/actions/workflows/ci.yml"><img src="https://github.com/YucaApp/puffer/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
 
 Text expansion for the Mac. Type a shortcode such as `;sig` in any app and
 Puffer replaces it with the text you saved for it: a signature, an address, a
@@ -216,10 +222,13 @@ SIGN_ID="Developer ID Application: Your Name (TEAMID)" NOTARY_PROFILE=puffer ./s
 
 ### App icon
 
-`Resources/AppIcon.icns` is generated from `Resources/icon-source.png`:
+`Resources/AppIcon.icns` is generated from `Resources/icon-source.png`, and
+`docs/icon.png` (shown at the top of this file) is taken from it:
 
 ```sh
 swift scripts/make-icon.swift
+iconutil -c iconset -o /tmp/AppIcon.iconset Resources/AppIcon.icns
+cp /tmp/AppIcon.iconset/icon_256x256@2x.png docs/icon.png
 ```
 
 ## Security
