@@ -1,0 +1,69 @@
+name: Release
+
+# Pushing a tag like v1.2.3 builds Puffer 1.2.3 and publishes it as a GitHub
+# release with the disk image attached.
+#
+# Signing is optional. With these repository secrets the release is signed
+# with a Developer ID and notarised, so macOS opens it without complaint:
+#
+#   DEVELOPER_ID_P12           the "Developer ID Application" certificate and
+#                              its private key, exported as .p12, base64-encoded
+#   DEVELOPER_ID_P12_PASSWORD  the password of that .p12
+#   DEVELOPER_ID_NAME          e.g. "Developer ID Application: Name (TEAMID)"
+#   NOTARY_APPLE_ID            the Apple ID to notarise with
+#   NOTARY_TEAM_ID             its team ID
+#   NOTARY_PASSWORD            an app-specific password for that Apple ID
+#
+# Without them the app is ad-hoc signed and users have to approve it by hand
+# (the README explains how).
+
+on:
+  push:
+    tags: ["v[0-9]*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    env:
+      DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
+      DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+      DEVELOPER_ID_NAME: ${{ secrets.DEVELOPER_ID_NAME }}
+      NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+      NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+      NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit tests
+        run: ./scripts/test.sh
+
+      - name: Import the Developer ID certificate
+        if: env.DEVELOPER_ID_P12 != ''
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          echo "$DEVELOPER_ID_P12" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/developer-id.p12" -k "$keychain" \
+            -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          rm "$RUNNER_TEMP/developer-id.p12"
+          echo "SIGN_ID=$DEVELOPER_ID_NAME" >> "$GITHUB_ENV"
+
+      - name: Build the disk image
+        run: ./scripts/release.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/Puffer-$version.dmg" "dist/Puffer-$version.dmg.sha256" \
+            --title "Puffer $version" --generate-notes --verify-tag

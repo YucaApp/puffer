@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show toolchain
+        run: swift --version
+      - name: Unit tests
+        run: ./scripts/test.sh
+      - name: Build the app
+        # No signing certificate on the runner, so this build is ad-hoc signed.
+        run: ./scripts/build-app.sh
